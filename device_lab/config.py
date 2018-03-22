@@ -5,7 +5,7 @@ from sqlalchemy.engine.url import URL
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-PORT = os.environ.get("PORT", 8888)
+PORT = int(os.environ.get("PORT", 8888))
 
 DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
 DB_PORT = int(os.environ.get("DB_PORT", 3306))
