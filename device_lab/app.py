@@ -6,7 +6,7 @@ import tornado.auth
 import tornado.gen
 import tornado.concurrent
 
-from .config import PORT
+from config import PORT
 
 
 class BaseHandler(tornado.web.RequestHandler):
