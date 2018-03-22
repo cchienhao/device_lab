@@ -8,8 +8,8 @@ from config import DB_URL
 Base = declarative_base()
 
 
-class SeleniumHub(Base):
-    __tablename__ = 'selenium_hub'
+class SeleniumGrid(Base):
+    __tablename__ = 'selenium_grid'
     id = Column(Integer, primary_key=True)
     name = Column(String(250), nullable=False)
 
