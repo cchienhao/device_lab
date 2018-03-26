@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class SeleniumGridService(object):
     def __init__(self):
-        self._devices = {}
+        self._hubs_detail = {}  # index by hub_url
         self._selenium_grid_client = SeleniumGridClient()
 
     def get_all_hubs_url(self):
@@ -34,9 +34,9 @@ class SeleniumGridService(object):
                 .map(lambda res: (hub_url, json.loads(res.body))) \
                 .catch_exception(handler=on_error)  # make sure this observable never emit error
 
-        def update_device(url, res):
+        def update_hub_detail(url, res):
             try:
-                self._devices.update({url: res['nodes']})
+                self._hubs_detail.update({url: res['nodes']})
             except:
                 logger.exception('fail to update %s', url)
             else:
@@ -46,14 +46,14 @@ class SeleniumGridService(object):
             .flat_map(lambda _: Observable.from_(self.get_all_hubs_url())) \
             .retry() \
             .flat_map(fetch_nodes_by_hub_url) \
-            .subscribe(lambda url_res: update_device(url_res[0], url_res[1])) \
+            .subscribe(lambda url_res: update_hub_detail(url_res[0], url_res[1])) \
 
 
     def get_devices(self):
-        return self._devices
+        return self._hubs_detail
 
 
 scheduler = IOLoopScheduler()
 selenium_grid_service = SeleniumGridService()
 # start background job to update devices
-selenium_grid_service.update_devices_in_background(1)
+selenium_grid_service.update_devices_in_background(10)
