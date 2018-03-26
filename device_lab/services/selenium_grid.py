@@ -6,7 +6,7 @@ from rx import Observable
 from rx.concurrency import IOLoopScheduler
 
 from models.db_schema import Session, SeleniumGridHub
-from utils.clients.selenium_grid import selenium_grid_client
+from utils.clients.selenium_grid import SeleniumGridClient
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class SeleniumGridService(object):
     def __init__(self):
         self._devices = {}
-        self.i = 0
+        self._selenium_grid_client = SeleniumGridClient()
 
     def get_all_hubs_url(self):
         session = Session()
@@ -26,10 +26,13 @@ class SeleniumGridService(object):
 
     def update_devices_in_background(self, period=10):
         def fetch_nodes_by_hub_url(hub_url):
-            feature = convert_yielded(selenium_grid_client.get_devices_by_hub_url_async(hub_url))
+            def on_error(e):
+                logger.exception("fail to fetch nodes by url: %s", hub_url)
+                return Observable.empty()
+            feature = convert_yielded(self._selenium_grid_client.get_devices_by_hub_url_async(hub_url))
             return Observable.from_future(feature) \
                 .map(lambda res: (hub_url, json.loads(res.body))) \
-                .catch_exception(Observable.empty())
+                .catch_exception(handler=on_error)  # make sure this observable never emit error
 
         def update_device(url, res):
             try:
@@ -53,4 +56,4 @@ class SeleniumGridService(object):
 scheduler = IOLoopScheduler()
 selenium_grid_service = SeleniumGridService()
 # start background job to update devices
-selenium_grid_service.update_devices_in_background(10)
+selenium_grid_service.update_devices_in_background(1)

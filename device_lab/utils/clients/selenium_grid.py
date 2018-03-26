@@ -18,6 +18,3 @@ class SeleniumGridClient(object):
         api_url = urljoin(hub_url, '/grid/admin/ShowAllNodesServlet')
         res = yield self._http.fetch(api_url)
         return res
-
-
-selenium_grid_client = SeleniumGridClient()
