@@ -42,7 +42,7 @@ class SeleniumGridService(object):
 
         def group_by_cap(acc, cap):
             if acc is False:  # using False here is if acc is None, reduce will take first item as acc
-                acc = cap['capabilities']
+                acc = dict(capabilities=cap['capabilities'])
             node = {k: v for k, v in cap.items() if k != 'capabilities'}
             acc.setdefault('nodes', []).append(node)
             return acc
