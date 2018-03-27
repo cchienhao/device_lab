@@ -40,8 +40,17 @@ class SeleniumGridService(object):
                 .flat_map(unpack_node) \
                 .map(lambda cap: cap.update(hub_url=hub_url) or cap)
 
+        def group_by_cap(acc, cap):
+            if acc is False:  # using False here is if acc is None, reduce will take first item as acc
+                acc = cap['capabilities']
+            node = {k: v for k, v in cap.items() if k != 'capabilities'}
+            acc.setdefault('nodes', []).append(node)
+            return acc
+
         query = Observable.from_(self._hubs_detail.items()) \
-            .flat_map(unpack_hub)
+            .flat_map(unpack_hub) \
+            .group_by(lambda cap: cap['capabilities']['UDID']) \
+            .flat_map(lambda group: group.reduce(group_by_cap, False))
 
         def filter_by_query_params(cap):
             cond = True
