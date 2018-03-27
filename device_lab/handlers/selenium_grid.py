@@ -10,7 +10,7 @@ class SeleniumGridListHandler(BaseHandler):
     @tornado.gen.coroutine
     def get(self):
         devices = selenium_grid_service.get_devices(
-            platform_name=self.get_argument('platform_name'),
+            platform_name=self.get_argument('platform_name', None),
             platform_version=self.get_argument('platform_version', None),
             platform_version_gt=self.get_argument('platform_version_gt', None),
             platform_version_gte=self.get_argument('platform_version_gte', None),

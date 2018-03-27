@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 class SeleniumGridService(object):
-    def __init__(self):
+    def __init__(self, selenium_grid_client=None):
         self._hubs_detail = {}  # index by hub_url
-        self._selenium_grid_client = SeleniumGridClient()
+        self._selenium_grid_client = selenium_grid_client or SeleniumGridClient()
 
     def get_all_hubs_url(self):
         session = Session()
@@ -24,58 +24,42 @@ class SeleniumGridService(object):
             session.close()
         return list(hub.url for hub in hubs)
 
-    def get_devices(self, **kwargs):
+    def get_devices(self, platform_name, platform_version,
+                    platform_version_gt, platform_version_gte, platform_version_lt, platform_version_lte):
         def unpack_node(node):
             node_url = node['id']
             browsers = node['protocols']['web_driver']['browsers'].values()
             return Observable.from_iterable(browsers) \
                 .flat_map(lambda browser: Observable.from_(browser[browser['version']])) \
                 .catch_exception(Observable.empty()) \
-                .map(lambda cap: (node_url, cap))
+                .map(lambda cap: cap.update(appium_url=node_url) or cap)
 
         def unpack_hub(url_nodes):
             hub_url, appium_nodes = url_nodes
             return Observable.from_(appium_nodes['nodes']) \
                 .flat_map(unpack_node) \
-                .map(lambda node_url_cap: (hub_url, *node_url_cap))
+                .map(lambda cap: cap.update(hub_url=hub_url) or cap)
 
         query = Observable.from_(self._hubs_detail.items()) \
             .flat_map(unpack_hub)
 
-        platform_name = kwargs.get('platform_name', None)  # Android/iOS
-        if platform_name is None:
-            raise ValueError("platform name is required")
-
-        def filter_platform_name(hub_node_cap):
-            hub_url, node_url, cap = hub_node_cap
-            return cap['capabilities']['platformName'] == platform_name
-        query = query.filter(filter_platform_name)
-
-        platform_version = kwargs.get('platform_version', None)
-        platform_version_gt = kwargs.get('platform_version_gt', None)
-        platform_version_gte = kwargs.get('platform_version_gte', None)
-        platform_version_lt = kwargs.get('platform_version_lt', None)
-        platform_version_lte = kwargs.get('platform_version_lte', None)
-
-        def filter_platform_version(hub_node_cap):
-            hub_url, node_url, cap = hub_node_cap
+        def filter_by_query_params(cap):
             cond = True
-            version = cap['capabilities']['version']
+            if platform_name is not None:
+                cond = cond and cap['capabilities']['platformName'] == platform_name
             if platform_version is not None:
-                cond = cond and version == platform_version
+                cond = cond and cap['capabilities']['version'] == platform_version
             if platform_version_gt is not None:
-                cond = cond and version > platform_version_gt
+                cond = cond and cap['capabilities']['version'] > platform_version_gt
             if platform_version_gte is not None:
-                cond = cond and version >= platform_version_gte
+                cond = cond and cap['capabilities']['version'] >= platform_version_gte
             if platform_version_lt is not None:
-                cond = cond and version < platform_version_lt
+                cond = cond and cap['capabilities']['version'] < platform_version_lt
             if platform_version_lt is not None:
-                cond = cond and version <= platform_version_lte
+                cond = cond and cap['capabilities']['version'] <= platform_version_lte
             return cond
-        query = query.filter(filter_platform_version)
-
-        query.subscribe(print)
-        return self._hubs_detail
+        query = query.filter(filter_by_query_params)
+        return list(query.to_blocking())
 
     def update_hubs_detail(self, hubs_detail):
         self._hubs_detail = hubs_detail
