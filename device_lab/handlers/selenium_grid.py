@@ -10,6 +10,8 @@ class SeleniumGridListHandler(BaseHandler):
     def get(self):
         """Get available capabilities endpoint
         ---
+        tags:
+            - capability
         summary: Get available capabilities by conditions
         parameters:
             - in: query

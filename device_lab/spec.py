@@ -31,4 +31,4 @@ def append_spec_endpoint(api_endpoints, base_url, path=r'swagger'):
 def append_swagger_ui_endpoint(endpoints, base_url, path=r'(swagger-ui.*)'):
     # static url must include one and only one group to indicate file name
     url = urljoin(base_url, path)
-    endpoints.append((url, tornado.web.StaticFileHandler, dict(path=STATIC_PATH)))
+    endpoints.append((url, tornado.web.StaticFileHandler, dict(path=STATIC_PATH, default_filename="index.html")))
