@@ -15,6 +15,6 @@ class SeleniumGridClient(object):
         :param hub_url:
         :return: devices' configuration and status
         """
-        api_url = urljoin(hub_url, '/grid/admin/ShowAllNodesServlet')
+        api_url = urljoin(hub_url, 'grid/admin/ShowAllNodesServlet')
         res = yield self._http.fetch(api_url)
         return res
