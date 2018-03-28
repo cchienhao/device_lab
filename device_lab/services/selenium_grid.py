@@ -24,17 +24,14 @@ class SeleniumGridService(object):
             session.close()
         return list(hub.url for hub in hubs)
 
-    def get_available_capabilities(self, platform_name, platform_version,
-                                   platform_version_gt, platform_version_gte,
-                                   platform_version_lt, platform_version_lte):
+    def get_available_capabilities(self, platform_name,
+                                   platform_version, min_platform_version, max_platform_version):
         query = Observable.from_(self._capabilities) \
             .filter(lambda cap: not cap['busy']) \
             .filter(lambda cap: platform_name is None or cap['capabilities']['platformName'] == platform_name) \
-            .filter(lambda cap: platform_version is None or cap['capabilities']['version'] == platform_version) \
-            .filter(lambda cap: platform_version_gt is None or cap['capabilities']['version'] > platform_version_gt) \
-            .filter(lambda cap: platform_version_gte is None or cap['capabilities']['version'] >= platform_version_gte) \
-            .filter(lambda cap: platform_version_lt is None or cap['capabilities']['version'] < platform_version_lt) \
-            .filter(lambda cap: platform_version_lte is None or cap['capabilities']['version'] <= platform_version_lte)
+            .filter(lambda cap: len(platform_version) == 0 or cap['capabilities']['version'] in platform_version) \
+            .filter(lambda cap: min_platform_version is None or cap['capabilities']['version'] >= min_platform_version) \
+            .filter(lambda cap: max_platform_version is None or cap['capabilities']['version'] <= max_platform_version)
         candidates = list(query.to_blocking())
         result, selected_udid, selected_appium = [], set(), set()
         for cap in candidates:

@@ -11,10 +11,8 @@ class SeleniumGridListHandler(BaseHandler):
     def get(self):
         devices = selenium_grid_service.get_available_capabilities(
             platform_name=self.get_argument('platform_name', None),
-            platform_version=self.get_argument('platform_version', None),
-            platform_version_gt=self.get_argument('platform_version_gt', None),
-            platform_version_gte=self.get_argument('platform_version_gte', None),
-            platform_version_lt=self.get_argument('platform_version_lt', None),
-            platform_version_lte=self.get_argument('platform_version_lte', None),
+            platform_version=self.get_arguments('platform_version'),
+            min_platform_version=self.get_argument('min_platform_version', None),
+            max_platform_version=self.get_argument('max_platform_version', None),
         )
         self.write(json.dumps(devices))
