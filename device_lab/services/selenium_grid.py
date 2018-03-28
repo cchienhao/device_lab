@@ -26,8 +26,15 @@ class SeleniumGridService(object):
 
     def get_available_capabilities(self, platform_name,
                                    platform_version, min_platform_version, max_platform_version):
+        # if any cap of an appium node is busy, then the appium node is considered busy
+        busy_appium_nodes = set(
+            Observable.from_(self._capabilities)
+                .filter(lambda c: c['busy'])
+                .map(lambda c: c['appium_url'])
+                .to_blocking()
+        )
         query = Observable.from_(self._capabilities) \
-            .filter(lambda c: not c['busy']) \
+            .filter(lambda c: c['appium_url'] not in busy_appium_nodes) \
             .filter(lambda c: platform_name is None or c['capabilities']['platformName'] == platform_name) \
             .filter(lambda c: len(platform_version) == 0 or c['capabilities']['version'] in platform_version) \
             .filter(lambda c: min_platform_version is None or c['capabilities']['version'] >= min_platform_version) \
