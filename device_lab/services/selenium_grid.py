@@ -27,11 +27,11 @@ class SeleniumGridService(object):
     def get_available_capabilities(self, platform_name,
                                    platform_version, min_platform_version, max_platform_version):
         query = Observable.from_(self._capabilities) \
-            .filter(lambda cap: not cap['busy']) \
-            .filter(lambda cap: platform_name is None or cap['capabilities']['platformName'] == platform_name) \
-            .filter(lambda cap: len(platform_version) == 0 or cap['capabilities']['version'] in platform_version) \
-            .filter(lambda cap: min_platform_version is None or cap['capabilities']['version'] >= min_platform_version) \
-            .filter(lambda cap: max_platform_version is None or cap['capabilities']['version'] <= max_platform_version)
+            .filter(lambda c: not c['busy']) \
+            .filter(lambda c: platform_name is None or c['capabilities']['platformName'] == platform_name) \
+            .filter(lambda c: len(platform_version) == 0 or c['capabilities']['version'] in platform_version) \
+            .filter(lambda c: min_platform_version is None or c['capabilities']['version'] >= min_platform_version) \
+            .filter(lambda c: max_platform_version is None or c['capabilities']['version'] <= max_platform_version)
         candidates = list(query.to_blocking())
         result, selected_udid, selected_appium = [], set(), set()
         for cap in candidates:
