@@ -21,3 +21,13 @@ DB_URL = URL(
     password=DB_PASSWORD,
     database=DB_NAME,
 )
+
+STATIC_PATH = os.environ.get("STATIC_PATH", os.path.join(os.path.dirname(__file__), "static"))
+
+TORNADO_SETTINGS = {
+    "static_path": STATIC_PATH,
+    "debug": DEBUG_MODE,
+}
+
+API_BASE_URL = r'/device_lab/api/v1/'
+STATIC_BASE_URL = r'/device_lab/static/'
