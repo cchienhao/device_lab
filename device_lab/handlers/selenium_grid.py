@@ -19,13 +19,14 @@ class SeleniumGridListHandler(BaseHandler):
               required: true
             - in: query
               name: platform_version
-              required: false
+              type: array
+              collectionFormat: multi
+              items:
+                type: string
             - in: query
               name: min_platform_version
-              required: false
             - in: query
               name: max_platform_version
-              required: false
         responses:
             200:
                 description: available capabilities matched query conditions
