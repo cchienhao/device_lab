@@ -9,7 +9,7 @@ from services.selenium_grid import selenium_grid_service
 class SeleniumGridListHandler(BaseHandler):
     @tornado.gen.coroutine
     def get(self):
-        devices = selenium_grid_service.get_devices(
+        devices = selenium_grid_service.get_available_capabilities(
             platform_name=self.get_argument('platform_name', None),
             platform_version=self.get_argument('platform_version', None),
             platform_version_gt=self.get_argument('platform_version_gt', None),

@@ -17,11 +17,11 @@ class TestSeleniumGridClient(tornado.testing.AsyncTestCase):
 class TestSeleniumGridService(unittest.TestCase):
     def test_query_deivces1(self):
         selenium_grid_service.update_hubs_detail(HUBS_DETAIL)
-        selenium_grid_service.get_devices(platform_name='ios')
+        selenium_grid_service.get_available_capabilities(platform_name='ios')
 
     def test_query_devices2(self):
         selenium_grid_service.update_hubs_detail(HUBS_DETAIL)
-        selenium_grid_service.get_devices(platform_name='ios', platform_version='11.2.6')
+        selenium_grid_service.get_available_capabilities(platform_name='ios', platform_version='11.2.6')
 
 
 HUBS_DETAIL = {'http://10.32.52.92:4444/': {'nodes': [{'class': 'DefaultRemoteProxy',
