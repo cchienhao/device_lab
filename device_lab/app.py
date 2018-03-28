@@ -10,7 +10,7 @@ import tornado.web
 
 from config import PORT, TORNADO_SETTINGS, API_BASE_URL, STATIC_BASE_URL
 from spec import append_spec_endpoint, append_swagger_ui_endpoint
-from handlers.selenium_grid import SeleniumGridListHandler
+from handlers.selenium_grid import CapabilityListHandler
 
 
 def set_base_url(base_url, api_endpoints):
@@ -21,7 +21,7 @@ def set_base_url(base_url, api_endpoints):
 def main():
     # set api base url
     api_endpoints = set_base_url(API_BASE_URL, [
-        (r"capabilities", SeleniumGridListHandler),
+        (r"capabilities", CapabilityListHandler),
     ])
     # add spec endpoint
     append_spec_endpoint(api_endpoints, API_BASE_URL)

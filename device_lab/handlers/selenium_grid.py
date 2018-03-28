@@ -5,7 +5,7 @@ from handlers.base import BaseHandler
 from services.selenium_grid import selenium_grid_service
 
 
-class SeleniumGridListHandler(BaseHandler):
+class CapabilityListHandler(BaseHandler):
     @tornado.gen.coroutine
     def get(self):
         """Get available capabilities endpoint

@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 class SeleniumGridService(object):
     def __init__(self, selenium_grid_client=None):
-        self._capabilities = []
         self._selenium_grid_client = selenium_grid_client or SeleniumGridClient()
+        self._capabilities = []
 
     def get_all_hubs_url(self):
         session = Session()
@@ -26,15 +26,7 @@ class SeleniumGridService(object):
 
     def get_available_capabilities(self, platform_name,
                                    platform_version, min_platform_version, max_platform_version):
-        # if any cap of an appium node is busy, then the appium node is considered busy
-        busy_appium_nodes = set(
-            Observable.from_(self._capabilities)
-                .filter(lambda c: c['busy'])
-                .map(lambda c: c['appium_url'])
-                .to_blocking()
-        )
         query = Observable.from_(self._capabilities) \
-            .filter(lambda c: c['appium_url'] not in busy_appium_nodes) \
             .filter(lambda c: platform_name is None or c['capabilities']['platformName'] == platform_name) \
             .filter(lambda c: len(platform_version) == 0 or c['capabilities']['version'] in platform_version) \
             .filter(lambda c: min_platform_version is None or c['capabilities']['version'] >= min_platform_version) \
@@ -49,42 +41,42 @@ class SeleniumGridService(object):
             result.append(cap)
         return result
 
-    def update_capabilities(self, caps):
+    def set_capabilities(self, caps):
         self._capabilities = caps
 
+    def update_capabilities(self, *_args):
+        Observable.from_(self.get_all_hubs_url(), scheduler=scheduler) \
+            .distinct() \
+            .flat_map(self._fetch_hub_detail) \
+            .to_list() \
+            .subscribe(self.set_capabilities)
+
     def update_capabilities_in_background(self, period=10):
-        def fetch_nodes_by_hub_url(hub_url):
-            def unpack_node(node):
-                node_url = node['id']
-                browsers = node['protocols']['web_driver']['browsers'].values()
-                return Observable.from_iterable(browsers) \
-                    .flat_map(lambda browser: Observable.from_(browser[browser['version']])) \
-                    .catch_exception(Observable.empty()) \
-                    .map(lambda cap: cap.update(appium_url=node_url, hub_url=hub_url) or cap)
-
-            def unpack_hub(hub_detail):
-                return Observable.from_(hub_detail['nodes']) \
-                    .flat_map(unpack_node)
-
-            def on_error(e):
-                logger.exception("fail to fetch nodes by url: %s", hub_url)
-                return Observable.empty()
-
-            future = convert_yielded(self._selenium_grid_client.get_devices_by_hub_url_async(hub_url))
-            return Observable.from_future(future) \
-                .map(lambda res: json.loads(res.body)) \
-                .flat_map(unpack_hub) \
-                .catch_exception(handler=on_error)  # make sure this observable never emit error
-
-        def update_capabilities(*args):
-            Observable.from_(self.get_all_hubs_url(), scheduler=scheduler) \
-                .distinct() \
-                .flat_map(fetch_nodes_by_hub_url) \
-                .to_list() \
-                .subscribe(self.update_capabilities)
-
         Observable.interval(period*1000, scheduler=scheduler) \
-            .subscribe(update_capabilities)
+            .subscribe(self.update_capabilities)
+
+    def _fetch_hub_detail(self, hub_url) -> Observable:
+        def unpack_node(node):
+            node_url = node['id']
+            browsers = node['protocols']['web_driver']['browsers'].values()
+            return Observable.from_iterable(browsers) \
+                .flat_map(lambda browser: Observable.from_(browser[browser['version']])) \
+                .catch_exception(Observable.empty()) \
+                .map(lambda cap: cap.update(appium_url=node_url, hub_url=hub_url) or cap)
+
+        def unpack_hub(hub_detail):
+            return Observable.from_(hub_detail['nodes']) \
+                .flat_map(unpack_node)
+
+        def on_error(_e):
+            logger.exception("fail to fetch nodes by url: %s", hub_url)
+            return Observable.empty()
+
+        future = convert_yielded(self._selenium_grid_client.get_devices_by_hub_url_async(hub_url))
+        return Observable.from_future(future) \
+            .map(lambda res: json.loads(res.body)) \
+            .flat_map(unpack_hub) \
+            .catch_exception(handler=on_error)  # make sure this observable never emit error
 
 
 scheduler = IOLoopScheduler()
