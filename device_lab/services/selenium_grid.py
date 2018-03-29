@@ -1,6 +1,4 @@
 import json
-import time
-import uuid
 import logging
 from urllib.parse import urlsplit
 
@@ -11,67 +9,15 @@ from rx.concurrency import IOLoopScheduler
 
 from models.db_schema import Session, SeleniumGridHub
 from utils.clients.selenium_grid import SeleniumGridClient
+from utils.managers import SimpleLockManager, SimpleStoreManager
+from services.base import BaseServiceException
 
 logger = logging.getLogger(__name__)
 
 
-class SimpleLockManager(object):
-    def __init__(self):
-        self._lock = {}  # k: key, v: expired_at
-
-    @staticmethod
-    def get_current_time():
-        return time.time()
-
-    def acquire(self, key, expired=5, refresh=False):
-        # non thread safe, using in single thread context
-        ts = self.get_current_time()
-        if key in self._lock and not refresh:
-            raise RuntimeError("cannot lock: {}".format(key))
-        self._lock[key] = ts + expired
-
-    def release(self, key):
-        # non thread safe, using in single thread context
-        if key in self._lock:
-            del self._lock[key]
-        else:
-            logger.warning('release an un-acquired key: %s', key)
-
-    def is_lock(self, key):
-        return key in self._lock
-
-    def release_expired_keys(self):
-        current = self.get_current_time()
-        expired_keys = []
-        for key, expired_at in self._lock.items():
-            if current > expired_at:
-                logger.warning('found expired key: %s, %s', key, expired_at)
-                expired_keys.append(key)
-        for key in expired_keys:
-            del self._lock[key]
-        total = len(expired_keys)
-        if total > 0:
-            logger.warning('expired keys are released, total: %s', total)
-
-
-class SimpleStoreManager(object):
-    def __init__(self):
-        self._store = {}
-
-    def create(self, obj):
-        while True:
-            token = self._new_token()
-            if token in self._store:
-                continue
-            self._store[token] = obj
-            return token
-
-    def pop(self, token):
-        return self._store.pop(token, None)
-
-    @staticmethod
-    def _new_token():
-        return uuid.uuid4().hex
+class LockConflictException(BaseServiceException):
+    def __init__(self, err_msg):
+        super().__init__(self.CONFLICT_CODE, err_msg)
 
 
 class SeleniumGridService(object):
@@ -116,8 +62,12 @@ class SeleniumGridService(object):
 
     def lock_capability(self, appium_url, udid, timeout):
         appium_netloc = self._get_netloc(appium_url)
-        self._appium_lock.acquire(appium_netloc, expired=timeout)
-        self._udid_lock.acquire(udid, expired=timeout)
+        try:
+            self._appium_lock.acquire(appium_netloc, expired=timeout)
+            self._udid_lock.acquire(udid, expired=timeout)
+        except RuntimeError as e:
+            msg = "lock conflict: {}, {}, {}".format(appium_url, udid, str(e))
+            raise LockConflictException(msg)
         return self._lock_store.create((appium_netloc, udid))
 
     def release_capability(self, lock_token):
@@ -143,9 +93,14 @@ class SeleniumGridService(object):
     def _fetch_hub_detail(self, hub_url) -> Observable:
         def unpack_node(node):
             node_url = node['id']
-            browsers = node['protocols']['web_driver']['browsers'].values()
-            return Observable.from_iterable(browsers) \
-                .flat_map(lambda browser: Observable.from_(browser[browser['version']])) \
+            malform_dto = node['protocols']['web_driver']['browsers']['']
+            if 'name' in malform_dto:
+                del malform_dto['name']
+            if 'version' in malform_dto:
+                del malform_dto['version']
+            cap_lists = malform_dto.values()  # list of cap_lists
+            return Observable.from_(cap_lists) \
+                .flat_map(lambda cap_list: Observable.from_(cap_list)) \
                 .catch_exception(Observable.empty()) \
                 .map(lambda cap: cap.update(appium_url=node_url, hub_url=hub_url) or cap)
 

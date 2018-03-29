@@ -2,6 +2,9 @@ import json
 import traceback
 
 import tornado.web
+from marshmallow.exceptions import ValidationError
+
+from services.base import BaseServiceException
 
 
 class BaseHandler(tornado.web.RequestHandler):
@@ -14,19 +17,23 @@ class BaseHandler(tornado.web.RequestHandler):
         self.set_status(204)
         self.finish()
 
-    def get_error_message(self, **kwargs):
-        if 'exc_info' not in kwargs:
-            return self._reason
-        type_, value_, traceback_ = kwargs['exc_info']
-        if isinstance(value_, tornado.web.MissingArgumentError):
-            return value_.log_message
+    def set_error_status(self, **kwargs):
+        if 'exc_info' in kwargs:
+            type_, value_, traceback_ = kwargs['exc_info']
+            if isinstance(value_, tornado.web.MissingArgumentError):
+                self.set_status(400, value_.log_message)
+            elif isinstance(value_, ValidationError):
+                self.set_status(400, str(value_))
+            elif isinstance(value_, BaseServiceException):
+                self.set_status(value_.err_code, value_.err_msg)
 
-    def write_error(self, status_code, **kwargs):
+    def write_error(self, _status_code, **kwargs):
+        self.set_error_status(**kwargs)
         self.set_header('Content-Type', 'application/json')
         err_res = {
-            'code': status_code,
+            'code': self._status_code,
             'data': {
-                'message': self.get_error_message(**kwargs)
+                'message': self._reason
             }
         }
         if self.settings.get("serve_traceback") and "exc_info" in kwargs:
