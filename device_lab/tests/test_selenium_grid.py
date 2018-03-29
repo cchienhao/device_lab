@@ -2,7 +2,7 @@ import unittest
 import tornado.testing
 
 from utils.clients.selenium_grid import SeleniumGridClient
-from services.selenium_grid import selenium_grid_service
+from services.selenium_grid import SeleniumGridService
 from services.selenium_grid import SimpleLockManager
 from time import sleep
 
@@ -17,13 +17,68 @@ class TestSeleniumGridClient(tornado.testing.AsyncTestCase):
 
 
 class TestSeleniumGridService(unittest.TestCase):
-    def test_query_deivces1(self):
-        selenium_grid_service.update_hubs_detail(HUBS_DETAIL)
-        selenium_grid_service.get_available_capabilities(platform_name='ios')
+    def setUp(self):
+        self.service = SeleniumGridService()
+        self.service.set_capabilities([
+            {
+                "capabilities": {
+                    "platformName": "ios",
+                    "version": "1",
+                    "UDID": "udid1",
+                },
+                "appium_url": "appium_url1",
+            },
+            {
+                "capabilities": {
+                    "platformName": "ios",
+                    "version": "2",
+                    "UDID": "udid2",
+                },
+                "appium_url": "appium_url1",
+            },
+            {
+                "capabilities": {
+                    "platformName": "ios",
+                    "version": "1",
+                    "UDID": "udid1",
+                },
+                "appium_url": "appium_url2",
+            },
+            {
+                "capabilities": {
+                    "platformName": "ios",
+                    "version": "2",
+                    "UDID": "udid2",
+                },
+                "appium_url": "appium_url2",
+            },
+        ])
 
-    def test_query_devices2(self):
-        selenium_grid_service.update_hubs_detail(HUBS_DETAIL)
-        selenium_grid_service.get_available_capabilities(platform_name='ios', platform_version='11.2.6')
+    def test_query_capabilities(self):
+        caps = self.service.get_available_capabilities(platform_name='ios')
+        expected = [{'capabilities': {'platformName': 'ios', 'version': '1', 'UDID': 'udid1'}, 'appium_url': 'appium_url1'},
+                    {'capabilities': {'platformName': 'ios', 'version': '2', 'UDID': 'udid2'}, 'appium_url': 'appium_url2'}]
+        self.assertEqual(expected, caps)
+
+        caps = self.service.get_available_capabilities(platform_name='ios', platform_version=['1'])
+        expected = [{'capabilities': {'platformName': 'ios', 'version': '1', 'UDID': 'udid1'}, 'appium_url': 'appium_url1'}]
+        self.assertEqual(expected, caps)
+
+        caps = self.service.get_available_capabilities(platform_name='ios', min_platform_version='3')
+        self.assertEqual([], caps)
+
+        caps = self.service.get_available_capabilities(platform_name='ios', max_platform_version='0')
+        self.assertEqual([], caps)
+
+        caps = self.service.get_available_capabilities(platform_name='ios', min_platform_version='0')
+        expected = [{'capabilities': {'platformName': 'ios', 'version': '1', 'UDID': 'udid1'}, 'appium_url': 'appium_url1'},
+                    {'capabilities': {'platformName': 'ios', 'version': '2', 'UDID': 'udid2'}, 'appium_url': 'appium_url2'}]
+        self.assertEqual(expected, caps)
+
+        caps = self.service.get_available_capabilities(platform_name='ios', max_platform_version='3')
+        expected = [{'capabilities': {'platformName': 'ios', 'version': '1', 'UDID': 'udid1'}, 'appium_url': 'appium_url1'},
+                    {'capabilities': {'platformName': 'ios', 'version': '2', 'UDID': 'udid2'}, 'appium_url': 'appium_url2'}]
+        self.assertEqual(expected, caps)
 
 
 class TestSimpleLockManager(unittest.TestCase):
@@ -52,7 +107,10 @@ class TestSimpleLockManager(unittest.TestCase):
         self.assertFalse(self.lock.is_lock('lock1'))
 
 
-HUBS_DETAIL = {'http://10.32.52.92:4444/': {'nodes': [{'class': 'DefaultRemoteProxy',
+
+
+# this dto must be refactored !
+_GRID_RAW_DATA = {'http://10.32.52.92:4444/': {'nodes': [{'class': 'DefaultRemoteProxy',
     'id': 'http://10.32.60.38:4723',
     'protocols': {'web_driver': {'browsers': {'': {'10.1': [{'busy': False,
           'capabilities': {'UDID': 'F0F743D2-839B-4809-B404-B19AB4CDD31D',
