@@ -20,6 +20,11 @@ class LockConflictException(BaseServiceException):
         super().__init__(self.CONFLICT_CODE, err_msg)
 
 
+class LockNotFoundException(BaseServiceException):
+    def __init__(self, err_msg):
+        super().__init__(self.NOT_FOUND_CODE, err_msg)
+
+
 class SeleniumGridService(object):
     def __init__(self, selenium_grid_client=None):
         self._selenium_grid_client = selenium_grid_client or SeleniumGridClient()
@@ -67,13 +72,16 @@ class SeleniumGridService(object):
             self._udid_lock.acquire(udid, expired=timeout)
         except RuntimeError as e:
             msg = "lock conflict: {}, {}, {}".format(appium_url, udid, str(e))
+            logger.info(msg)
             raise LockConflictException(msg)
         return self._lock_store.create((appium_netloc, udid))
 
     def release_capability(self, lock_token):
         ret = self._lock_store.pop(lock_token)
         if ret is None:
-            return
+            msg = "lock token does not exists: {}".format(lock_token)
+            logger.info(msg)
+            raise LockNotFoundException(msg)
         appium_netloc, udid = ret
         self._appium_lock.release(appium_netloc)
         self._udid_lock.release(udid)
