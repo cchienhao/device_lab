@@ -107,8 +107,6 @@ class TestSimpleLockManager(unittest.TestCase):
         self.assertFalse(self.lock.is_lock('lock1'))
 
 
-
-
 # this dto must be refactored !
 _GRID_RAW_DATA = {'http://10.32.52.92:4444/': {'nodes': [{'class': 'DefaultRemoteProxy',
     'id': 'http://10.32.60.38:4723',
