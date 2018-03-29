@@ -1,5 +1,8 @@
 import json
+import time
 import logging
+from urllib.parse import urlsplit
+
 from tornado.gen import convert_yielded
 
 from rx import Observable
@@ -11,10 +14,52 @@ from utils.clients.selenium_grid import SeleniumGridClient
 logger = logging.getLogger(__name__)
 
 
+class SimpleLockManager(object):
+    def __init__(self, expired=10):
+        self._lock = {}  # k: key, v: ts
+        self._expired = expired
+
+    @staticmethod
+    def get_current_time():
+        return time.time()
+
+    def acquire(self, key, refresh=False):
+        # non thread safe, using in single thread context
+        ts = self.get_current_time()
+        if key in self._lock and not refresh:
+            raise RuntimeError("cannot lock: {}".format(key))
+        self._lock[key] = ts
+
+    def release(self, key):
+        # non thread safe, using in single thread context
+        if key in self._lock:
+            del self._lock[key]
+        else:
+            logger.warning('release an un-acquired key: %s', key)
+
+    def is_lock(self, key):
+        return key in self._lock
+
+    def release_expired_keys(self):
+        current = self.get_current_time()
+        expired_keys = []
+        for key, ts in self._lock.items():
+            if current - ts > self._expired:
+                logger.warning('found expired key: %s, %s', key, ts)
+                expired_keys.append(key)
+        for key in expired_keys:
+            del self._lock[key]
+        total = len(expired_keys)
+        if total > 0:
+            logger.warning('expired keys are released, total: %s', total)
+
+
 class SeleniumGridService(object):
-    def __init__(self, selenium_grid_client=None):
+    def __init__(self, selenium_grid_client=None, lock_expired=60):
         self._selenium_grid_client = selenium_grid_client or SeleniumGridClient()
         self._capabilities = []
+        self._appium_lock = SimpleLockManager(lock_expired)  # key: netloc
+        self._udid_lock = SimpleLockManager(lock_expired)  # key: udid
 
     def get_all_hubs_url(self):
         session = Session()
@@ -77,6 +122,11 @@ class SeleniumGridService(object):
             .map(lambda res: json.loads(res.body)) \
             .flat_map(unpack_hub) \
             .catch_exception(handler=on_error)  # make sure this observable never emit error
+
+
+def _get_netloc(url):
+    (_, netloc, *_) = urlsplit(url)
+    return netloc
 
 
 scheduler = IOLoopScheduler()
