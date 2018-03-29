@@ -28,6 +28,9 @@ class LockNotFoundException(BaseServiceException):
 class SeleniumGridService(object):
     def __init__(self, selenium_grid_client=None):
         self._selenium_grid_client = selenium_grid_client or SeleniumGridClient()
+        # SimpleLockManager works in non-distributed, single thread context
+        # for multi thread context, thread lock is needed
+        # for distributed context (multi process), redis is a good choice since its commands are run with exclusive way
         self._appium_lock = SimpleLockManager()  # key: netloc
         self._udid_lock = SimpleLockManager()  # key: udid
         self._lock_store = SimpleStoreManager()
