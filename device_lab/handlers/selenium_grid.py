@@ -9,8 +9,7 @@ from models.dto_schema import CapabilityLockSchema
 class CapabilityListHandler(BaseHandler):
     @tornado.gen.coroutine
     def get(self):
-        """Get available capabilities endpoint
-        ---
+        """---
         tags:
             - capability
         description: Get available capabilities by conditions
@@ -46,8 +45,7 @@ class CapabilityListHandler(BaseHandler):
 
 class CapabilityLockListHandler(BaseHandler):
     def post(self):
-        """Capability lock endpoint
-        ---
+        """---
         tags:
             - capability
         description: Lock Capability for exclusive usage
@@ -69,4 +67,17 @@ class CapabilityLockListHandler(BaseHandler):
 
 class CapabilityLockDetailHandler(BaseHandler):
     def delete(self, token):
-        pass
+        """---
+        tags:
+            - capability
+        description: release locked capability
+        parameters:
+            - in: path
+              name: token
+              required: true
+              type: string
+        responses:
+            204:
+                description: deleted
+        """
+        self.send_response(204, {})

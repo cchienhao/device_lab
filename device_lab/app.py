@@ -11,7 +11,7 @@ import tornado.web
 from config import PORT, TORNADO_SETTINGS, API_BASE_URL, STATIC_BASE_URL
 from spec import append_spec_endpoint, append_swagger_ui_endpoint
 
-from handlers.selenium_grid import CapabilityListHandler, CapabilityLockListHandler
+from handlers.selenium_grid import CapabilityListHandler, CapabilityLockListHandler, CapabilityLockDetailHandler
 
 
 def set_base_url(api_endpoints, base_url):
@@ -20,10 +20,13 @@ def set_base_url(api_endpoints, base_url):
 
 
 def main():
-    # set api base url
+    # NOTE: path here will be join with base_url later
+    # NOTE: path here should end with /?$ for compatibility
+    # NOTE: use named group so that apispec could generate proper path pattern
     api_endpoints = [
-        (r"capabilities", CapabilityListHandler),
-        (r"capabilities-lock", CapabilityLockListHandler),
+        (r"capabilities/?$", CapabilityListHandler),
+        (r"capabilities-lock/?$", CapabilityLockListHandler),
+        (r"capabilities-lock/(?P<token>[^/]+)/?$", CapabilityLockDetailHandler),
     ]
     # add spec endpoint
     append_spec_endpoint(api_endpoints)
