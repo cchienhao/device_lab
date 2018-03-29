@@ -1,5 +1,6 @@
 import json
 import time
+import uuid
 import logging
 from urllib.parse import urlsplit
 
@@ -54,12 +55,33 @@ class SimpleLockManager(object):
             logger.warning('expired keys are released, total: %s', total)
 
 
+class SimpleStoreManager(object):
+    def __init__(self):
+        self._store = {}
+
+    def create(self, obj):
+        while True:
+            token = self._new_token()
+            if token in self._store:
+                continue
+            self._store[token] = obj
+            return token
+
+    def pop(self, token):
+        return self._store.pop(token, None)
+
+    @staticmethod
+    def _new_token():
+        return uuid.uuid4().hex
+
+
 class SeleniumGridService(object):
     def __init__(self, selenium_grid_client=None, lock_expired=60):
         self._selenium_grid_client = selenium_grid_client or SeleniumGridClient()
-        self._capabilities = []
+        self._capabilities = []  # TODO: create a manager to handle capabilities
         self._appium_lock = SimpleLockManager(lock_expired)  # key: netloc
         self._udid_lock = SimpleLockManager(lock_expired)  # key: udid
+        self._lock_store = SimpleStoreManager()
 
     def get_all_hubs_url(self):
         session = Session()
@@ -86,15 +108,29 @@ class SeleniumGridService(object):
             result.append(cap)
         return result
 
-    def set_capabilities(self, caps):
-        self._capabilities = caps
-
     def update_capabilities(self, *_args):
         Observable.from_(self.get_all_hubs_url(), scheduler=scheduler) \
             .distinct() \
             .flat_map(self._fetch_hub_detail) \
             .to_list() \
             .subscribe(self.set_capabilities)
+
+    def lock_capability(self, appium_url, udid):
+        appium_netloc = self._get_netloc(appium_url)
+        self._appium_lock.acquire(appium_netloc)
+        self._udid_lock.acquire(udid)
+        return self._lock_store.create((appium_netloc, udid))
+
+    def release_capability(self, lock_token):
+        ret = self._lock_store.pop(lock_token)
+        if ret is None:
+            return
+        appium_netloc, udid = ret
+        self._appium_lock.release(appium_netloc)
+        self._udid_lock.release(udid)
+
+    def set_capabilities(self, caps):
+        self._capabilities = caps
 
     def update_capabilities_in_background(self, period=10):
         Observable.interval(period*1000, scheduler=scheduler) \
@@ -123,10 +159,10 @@ class SeleniumGridService(object):
             .flat_map(unpack_hub) \
             .catch_exception(handler=on_error)  # make sure this observable never emit error
 
-
-def _get_netloc(url):
-    (_, netloc, *_) = urlsplit(url)
-    return netloc
+    @staticmethod
+    def _get_netloc(url):
+        (_, netloc, *_) = urlsplit(url)
+        return netloc
 
 
 scheduler = IOLoopScheduler()
