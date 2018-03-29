@@ -84,20 +84,20 @@ class TestSeleniumGridService(unittest.TestCase):
 class TestSimpleLockManager(unittest.TestCase):
     def setUp(self):
         self.expired = 2
-        self.lock = SimpleLockManager(expired=self.expired)
+        self.lock = SimpleLockManager()
 
     def test_lock_acquire_and_release(self):
         self.assertFalse(self.lock.is_lock('lock1'))
-        self.lock.acquire('lock1')
+        self.lock.acquire('lock1', expired=self.expired)
         self.assertTrue(self.lock.is_lock('lock1'))
         with self.assertRaises(RuntimeError) as context:
-            self.lock.acquire('lock1')
+            self.lock.acquire('lock1', expired=self.expired)
         self.assertTrue('cannot lock: lock1' in str(context.exception))
         self.lock.release('lock1')
         self.assertFalse(self.lock.is_lock('lock1'))
 
     def test_lock_expired(self):
-        self.lock.acquire('lock1')
+        self.lock.acquire('lock1', expired=self.expired)
         self.assertTrue(self.lock.is_lock('lock1'))
         sleep(self.expired - 1)
         self.lock.release_expired_keys()

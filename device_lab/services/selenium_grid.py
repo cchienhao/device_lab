@@ -16,20 +16,19 @@ logger = logging.getLogger(__name__)
 
 
 class SimpleLockManager(object):
-    def __init__(self, expired=10):
-        self._lock = {}  # k: key, v: ts
-        self._expired = expired
+    def __init__(self):
+        self._lock = {}  # k: key, v: expired_at
 
     @staticmethod
     def get_current_time():
         return time.time()
 
-    def acquire(self, key, refresh=False):
+    def acquire(self, key, expired=5, refresh=False):
         # non thread safe, using in single thread context
         ts = self.get_current_time()
         if key in self._lock and not refresh:
             raise RuntimeError("cannot lock: {}".format(key))
-        self._lock[key] = ts
+        self._lock[key] = ts + expired
 
     def release(self, key):
         # non thread safe, using in single thread context
@@ -44,9 +43,9 @@ class SimpleLockManager(object):
     def release_expired_keys(self):
         current = self.get_current_time()
         expired_keys = []
-        for key, ts in self._lock.items():
-            if current - ts > self._expired:
-                logger.warning('found expired key: %s, %s', key, ts)
+        for key, expired_at in self._lock.items():
+            if current > expired_at:
+                logger.warning('found expired key: %s, %s', key, expired_at)
                 expired_keys.append(key)
         for key in expired_keys:
             del self._lock[key]
@@ -76,12 +75,12 @@ class SimpleStoreManager(object):
 
 
 class SeleniumGridService(object):
-    def __init__(self, selenium_grid_client=None, lock_expired=60):
+    def __init__(self, selenium_grid_client=None):
         self._selenium_grid_client = selenium_grid_client or SeleniumGridClient()
-        self._capabilities = []  # TODO: create a manager to handle capabilities
-        self._appium_lock = SimpleLockManager(lock_expired)  # key: netloc
-        self._udid_lock = SimpleLockManager(lock_expired)  # key: udid
+        self._appium_lock = SimpleLockManager()  # key: netloc
+        self._udid_lock = SimpleLockManager()  # key: udid
         self._lock_store = SimpleStoreManager()
+        self._capabilities = []  # TODO: create a manager to handle capabilities
 
     def get_all_hubs_url(self):
         session = Session()
@@ -115,10 +114,10 @@ class SeleniumGridService(object):
             .to_list() \
             .subscribe(self.set_capabilities)
 
-    def lock_capability(self, appium_url, udid):
+    def lock_capability(self, appium_url, udid, timeout):
         appium_netloc = self._get_netloc(appium_url)
-        self._appium_lock.acquire(appium_netloc)
-        self._udid_lock.acquire(udid)
+        self._appium_lock.acquire(appium_netloc, expired=timeout)
+        self._udid_lock.acquire(udid, expired=timeout)
         return self._lock_store.create((appium_netloc, udid))
 
     def release_capability(self, lock_token):
@@ -135,6 +134,11 @@ class SeleniumGridService(object):
     def update_capabilities_in_background(self, period=10):
         Observable.interval(period*1000, scheduler=scheduler) \
             .subscribe(self.update_capabilities)
+
+    def release_expired_lock_in_background(self, period=1):
+        ob = Observable.interval(period*1000, scheduler=scheduler)
+        ob.subscribe(lambda _: self._appium_lock.release_expired_keys())
+        ob.subscribe(lambda _: self._udid_lock.release_expired_keys())
 
     def _fetch_hub_detail(self, hub_url) -> Observable:
         def unpack_node(node):
@@ -167,5 +171,6 @@ class SeleniumGridService(object):
 
 scheduler = IOLoopScheduler()
 selenium_grid_service = SeleniumGridService()
-# start background job to update devices
+# start background job
 selenium_grid_service.update_capabilities_in_background(5)
+selenium_grid_service.release_expired_lock_in_background(1)
