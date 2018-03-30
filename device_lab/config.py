@@ -1,9 +1,8 @@
 import os
-import string
-import secrets
 import logging
 
 from sqlalchemy.engine.url import URL
+from utils.misc import new_random_string
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,6 +36,4 @@ STATIC_BASE_URL = r'/device_lab/static/'
 
 
 # service related configure
-alphabet = string.ascii_letters + string.digits
-default_secret = ''.join(secrets.choice(alphabet) for i in range(20))
-LOCK_SECRET = os.environ.get("LOCK_SECRET", default_secret)
+LOCK_SECRET = os.environ.get("LOCK_SECRET", new_random_string(20))

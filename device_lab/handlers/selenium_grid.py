@@ -58,7 +58,7 @@ class CapabilityLockListHandler(BaseHandler):
                 description: success
         """
         cap_lock = CapabilityLockSchema.from_json(self.request.body)
-        token = selenium_grid_service.lock_capability(cap_lock['appium_url'], cap_lock['udid'], cap_lock['timeout'])
+        token = selenium_grid_service.lock_capability(cap_lock['capability_token'], cap_lock['timeout'])
         data = {
             'token': token,
         }

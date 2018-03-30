@@ -14,7 +14,6 @@ class BaseSchema(Schema):
 
 
 class CapabilityLockSchema(BaseSchema):
-    appium_url = fields.String(required=True)
-    udid = fields.String(required=True)
-    timeout = fields.Integer(required=True, validate=lambda i: 0 < i < 7200)
+    capability_token = fields.String(required=True)
+    timeout = fields.Integer(required=True, validate=lambda i: 0 < i < 3600 * 4)
 register_schema('CapabilityLock', CapabilityLockSchema)
