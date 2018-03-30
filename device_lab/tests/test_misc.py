@@ -11,7 +11,7 @@ class TestOnExceptionReturn(unittest.TestCase):
         self.assertIsNone(raise_exception('bad things happen'))
 
     def test_on_error_exception_return_callable(self):
-        @on_exception_return(lambda e: str(e))
+        @on_exception_return(str)
         def raise_exception(msg):
             raise Exception(msg)
         msg = 'bad things happen'
