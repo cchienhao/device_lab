@@ -1,5 +1,8 @@
 import os
+import string
+import secrets
 import logging
+
 from sqlalchemy.engine.url import URL
 
 logging.basicConfig(level=logging.INFO)
@@ -31,3 +34,9 @@ TORNADO_SETTINGS = {
 
 API_BASE_URL = r'/device_lab/api/v1/'
 STATIC_BASE_URL = r'/device_lab/static/'
+
+
+# service related configure
+alphabet = string.ascii_letters + string.digits
+default_secret = ''.join(secrets.choice(alphabet) for i in range(20))
+LOCK_SECRET = os.environ.get("LOCK_SECRET", default_secret)

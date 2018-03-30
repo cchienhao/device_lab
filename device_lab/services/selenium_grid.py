@@ -47,6 +47,8 @@ class SeleniumGridService(object):
     def get_available_capabilities(self, platform_name,
                                    platform_version=None, min_platform_version=None, max_platform_version=None):
         query = Observable.from_(self._capabilities) \
+            .filter(lambda c: not self._appium_lock.is_lock(self._get_netloc(c['appium_url']))) \
+            .filter(lambda c: not self._udid_lock.is_lock(c['capabilities']['UDID'])) \
             .filter(lambda c: platform_name is None or c['capabilities']['platformName'] == platform_name) \
             .filter(lambda c: not platform_version or c['capabilities']['version'] in platform_version) \
             .filter(lambda c: min_platform_version is None or c['capabilities']['version'] >= min_platform_version) \

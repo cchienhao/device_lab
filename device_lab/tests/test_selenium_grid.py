@@ -54,27 +54,32 @@ class TestSeleniumGridService(unittest.TestCase):
             },
         ])
 
-    def test_query_capabilities(self):
+    def test_query_capabilities1(self):
         caps = self.service.get_available_capabilities(platform_name='ios')
         expected = [{'capabilities': {'platformName': 'ios', 'version': '1', 'UDID': 'udid1'}, 'appium_url': 'appium_url1'},
                     {'capabilities': {'platformName': 'ios', 'version': '2', 'UDID': 'udid2'}, 'appium_url': 'appium_url2'}]
         self.assertEqual(expected, caps)
 
+    def test_query_capabilities2(self):
         caps = self.service.get_available_capabilities(platform_name='ios', platform_version=['1'])
         expected = [{'capabilities': {'platformName': 'ios', 'version': '1', 'UDID': 'udid1'}, 'appium_url': 'appium_url1'}]
         self.assertEqual(expected, caps)
 
+    def test_query_capabilities3(self):
         caps = self.service.get_available_capabilities(platform_name='ios', min_platform_version='3')
         self.assertEqual([], caps)
 
+    def test_query_capabilities4(self):
         caps = self.service.get_available_capabilities(platform_name='ios', max_platform_version='0')
         self.assertEqual([], caps)
 
+    def test_query_capabilities5(self):
         caps = self.service.get_available_capabilities(platform_name='ios', min_platform_version='0')
         expected = [{'capabilities': {'platformName': 'ios', 'version': '1', 'UDID': 'udid1'}, 'appium_url': 'appium_url1'},
                     {'capabilities': {'platformName': 'ios', 'version': '2', 'UDID': 'udid2'}, 'appium_url': 'appium_url2'}]
         self.assertEqual(expected, caps)
 
+    def test_query_capabilities6(self):
         caps = self.service.get_available_capabilities(platform_name='ios', max_platform_version='3')
         expected = [{'capabilities': {'platformName': 'ios', 'version': '1', 'UDID': 'udid1'}, 'appium_url': 'appium_url1'},
                     {'capabilities': {'platformName': 'ios', 'version': '2', 'UDID': 'udid2'}, 'appium_url': 'appium_url2'}]
