@@ -21,9 +21,9 @@ Session = sessionmaker()
 Session.configure(bind=engine)
 
 
-def create_engine():
+def create_tables():
     Base.metadata.create_all(engine)
 
 
 if __name__ == '__main__':
-    create_engine()
+    create_tables()
