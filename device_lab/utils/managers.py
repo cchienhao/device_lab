@@ -15,10 +15,13 @@ class SimpleLockManager(object):
 
     def acquire(self, key, expired=5, refresh=False):
         # non thread safe, using in single thread context
-        ts = self.get_current_time()
-        if key in self._lock and not refresh:
-            raise RuntimeError("cannot lock: {}".format(key))
-        self._lock[key] = ts + expired
+        ts = self.get_current_time() + expired
+        if key in self._lock:
+            if not refresh:
+                raise RuntimeError("cannot lock: {}".format(key))
+            # refresh operator should not shorten the original duration
+            ts = max(self._lock[key], ts)
+        self._lock[key] = ts
 
     def release(self, key):
         # non thread safe, using in single thread context

@@ -1,7 +1,6 @@
 import json
 import time
 import logging
-from urllib.parse import urlsplit
 
 from tornado.gen import convert_yielded
 
@@ -12,9 +11,10 @@ from itsdangerous import URLSafeSerializer, BadSignature
 
 from models.db_schema import Session, SeleniumGridHub
 from utils.clients.selenium_grid import SeleniumGridClient
+from utils.clients.appium import AppiumClient
 from utils.managers import SimpleLockManager
 from services.base import BaseServiceException
-from utils.misc import new_random_string, on_exception_return
+from utils.misc import new_random_string, on_exception_return, get_base_url
 
 from config import LOCK_SECRET
 
@@ -33,8 +33,9 @@ class LockNotFoundException(BaseServiceException):
 
 
 class SeleniumGridService(object):
-    def __init__(self, selenium_grid_client=None, secret=new_random_string(20)):
+    def __init__(self, selenium_grid_client=None, appium_client=None, secret=new_random_string(20)):
         self._selenium_grid_client = selenium_grid_client or SeleniumGridClient()
+        self._appium_client = appium_client or AppiumClient()
         # SimpleLockManager works in non-distributed, single thread context
         # for multi thread context, thread lock is needed
         # for distributed context (multi process), redis is a good choice since its commands are run with exclusive way
@@ -73,12 +74,30 @@ class SeleniumGridService(object):
             result.append({**cap, "capability_token": cap_token})
         return result
 
-    def update_capabilities(self, *_args):
+    def update_capabilities_from_remote(self):
         Observable.from_(self.get_all_hubs_url(), scheduler=_scheduler) \
             .distinct() \
-            .flat_map(self._fetch_hub_detail) \
+            .flat_map(self._fetch_hub_detail_and_unpack_to_caps) \
             .to_list() \
             .subscribe(self.set_capabilities)
+
+    def refresh_capabilities_from_remote(self, period):
+        expired = period + 2  # expired should be a bit longer than polling period
+
+        def refresh_capability_lock(appium_url__cap):
+            appium_url, cap = appium_url__cap
+            self._appium_lock.acquire(appium_url, expired=expired, refresh=True)
+            logger.info('refresh appium node: %s', appium_url)
+            udid = cap['capabilities'].get('UDID')
+            if udid is not None:
+                logger.info('refresh udid: %s', udid)
+                self._udid_lock.acquire(udid, expired=expired, refresh=True)
+
+        Observable.from_(self._capabilities) \
+            .map(lambda cap: cap['appium_url']) \
+            .distinct() \
+            .flat_map(self._fetch_appium_sessions) \
+            .subscribe(refresh_capability_lock)
 
     def lock_capability(self, cap_token, timeout):
         try:
@@ -119,22 +138,26 @@ class SeleniumGridService(object):
 
     def update_capabilities_in_background(self, period=10):
         Observable.interval(period * 1000, scheduler=_scheduler) \
-            .subscribe(self.update_capabilities)
+            .subscribe(lambda _: self.update_capabilities_from_remote())
+
+    def refresh_capabilities_in_background(self, period=5):
+        Observable.interval(period * 1000, scheduler=_scheduler) \
+            .subscribe(lambda _: self.refresh_capabilities_from_remote(period))
 
     def release_expired_lock_in_background(self, period=1):
         ob = Observable.interval(period * 1000, scheduler=_scheduler)
         ob.subscribe(lambda _: self._appium_lock.release_expired_keys())
         ob.subscribe(lambda _: self._udid_lock.release_expired_keys())
 
-    def _fetch_hub_detail(self, hub_url) -> Observable:
+    def _fetch_hub_detail_and_unpack_to_caps(self, hub_url) -> Observable:
         def on_error(e):
             logger.error("fail to fetch nodes by url: %s, %s", hub_url, str(e))
             return Observable.empty()
 
         @on_exception_return(on_error)
         def unpack_node(node):
-            appium_netloc = self._get_netloc(node['id'])
-            hub_netloc = self._get_netloc(hub_url)
+            appium_netloc = self._get_base_url(node['id'])
+            hub_netloc = self._get_base_url(hub_url)
             malform_dto = node['protocols']['web_driver']['browsers']['']
             if 'name' in malform_dto:
                 del malform_dto['name']
@@ -156,10 +179,21 @@ class SeleniumGridService(object):
             .flat_map(unpack_hub) \
             .flat_map(unpack_node)
 
+    def _fetch_appium_sessions(self, appium_url) -> Observable:
+        def on_error(e):
+            logger.error("fail to fetch appium sessions by url: %s, %s", appium_url, str(e))
+            return Observable.empty()
+
+        future = convert_yielded(self._appium_client.get_sessions(appium_url))
+        return Observable.from_future(future) \
+            .map(lambda res: json.loads(res.body)) \
+            .catch_exception(handler=on_error) \
+            .flat_map(lambda data: Observable.from_(data['value'])) \
+            .map(lambda cap: (appium_url, cap))
+
     @staticmethod
-    def _get_netloc(url):
-        (_, netloc, *_) = urlsplit(url)
-        return netloc
+    def _get_base_url(url):
+        return get_base_url(url)
 
     @staticmethod
     def _get_current_time():
@@ -170,5 +204,6 @@ _scheduler = IOLoopScheduler()
 
 selenium_grid_service = SeleniumGridService(secret=LOCK_SECRET)
 # start background job
-selenium_grid_service.update_capabilities_in_background(5)
+selenium_grid_service.update_capabilities_in_background(10)
 selenium_grid_service.release_expired_lock_in_background(1)
+selenium_grid_service.refresh_capabilities_in_background(5)
