@@ -31,8 +31,8 @@ TORNADO_SETTINGS = {
     "debug": DEBUG_MODE,
 }
 
-API_BASE_URL = r'/device_lab/api/v1/'
-STATIC_BASE_URL = r'/device_lab/static/'
+API_BASE_URL = os.environ.get('API_BASE_URL', r'/device_lab/api/v1/')
+STATIC_BASE_URL = os.environ.get('STATIC_BASE_URL', r'/device_lab/static/')
 
 
 # service related configure
