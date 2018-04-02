@@ -14,7 +14,7 @@ from models.db_schema import Session, SeleniumGridHub
 from utils.clients.selenium_grid import SeleniumGridClient
 from utils.managers import SimpleLockManager
 from services.base import BaseServiceException
-from utils.misc import new_random_string
+from utils.misc import new_random_string, on_exception_return
 
 from config import LOCK_SECRET
 
@@ -74,7 +74,7 @@ class SeleniumGridService(object):
         return result
 
     def update_capabilities(self, *_args):
-        Observable.from_(self.get_all_hubs_url(), scheduler=scheduler) \
+        Observable.from_(self.get_all_hubs_url(), scheduler=_scheduler) \
             .distinct() \
             .flat_map(self._fetch_hub_detail) \
             .to_list() \
@@ -118,15 +118,20 @@ class SeleniumGridService(object):
         self._capabilities = caps
 
     def update_capabilities_in_background(self, period=10):
-        Observable.interval(period*1000, scheduler=scheduler) \
+        Observable.interval(period * 1000, scheduler=_scheduler) \
             .subscribe(self.update_capabilities)
 
     def release_expired_lock_in_background(self, period=1):
-        ob = Observable.interval(period*1000, scheduler=scheduler)
+        ob = Observable.interval(period * 1000, scheduler=_scheduler)
         ob.subscribe(lambda _: self._appium_lock.release_expired_keys())
         ob.subscribe(lambda _: self._udid_lock.release_expired_keys())
 
     def _fetch_hub_detail(self, hub_url) -> Observable:
+        def on_error(e):
+            logger.error("fail to fetch nodes by url: %s, %s", hub_url, str(e))
+            return Observable.empty()
+
+        @on_exception_return(on_error)
         def unpack_node(node):
             appium_netloc = self._get_netloc(node['id'])
             hub_netloc = self._get_netloc(hub_url)
@@ -138,21 +143,18 @@ class SeleniumGridService(object):
             cap_lists = malform_dto.values()  # list of cap_lists
             return Observable.from_(cap_lists) \
                 .flat_map(lambda cap_list: Observable.from_(cap_list)) \
-                .map(lambda cap: cap.update(appium_url=appium_netloc, hub_url=hub_netloc) or cap)
+                .map(lambda cap: {**cap, 'appium_url': appium_netloc, 'hub_url': hub_netloc})
 
+        @on_exception_return(on_error)
         def unpack_hub(hub_detail):
-            return Observable.from_(hub_detail['nodes']) \
-                .flat_map(unpack_node)
-
-        def on_error(e):
-            logger.error("fail to fetch nodes by url: %s, %s", hub_url, str(e))
-            return Observable.empty()
+            return Observable.from_(hub_detail['nodes'])
 
         future = convert_yielded(self._selenium_grid_client.get_devices_by_hub_url_async(hub_url))
         return Observable.from_future(future) \
             .map(lambda res: json.loads(res.body)) \
+            .catch_exception(handler=on_error) \
             .flat_map(unpack_hub) \
-            .catch_exception(handler=on_error)  # make sure this observable never emit error
+            .flat_map(unpack_node)
 
     @staticmethod
     def _get_netloc(url):
@@ -163,7 +165,8 @@ class SeleniumGridService(object):
     def _get_current_time():
         return int(time.time())
 
-scheduler = IOLoopScheduler()
+
+_scheduler = IOLoopScheduler()
 
 selenium_grid_service = SeleniumGridService(secret=LOCK_SECRET)
 # start background job
