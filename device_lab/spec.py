@@ -4,6 +4,7 @@ from urllib.parse import urljoin
 from marshmallow.class_registry import register
 from apispec import APISpec
 import tornado.web
+from handlers.base import BaseHandler
 
 from config import STATIC_PATH, API_BASE_URL
 
@@ -16,7 +17,7 @@ def append_spec_endpoint(api_endpoints, spec_path=r'swagger'):
         spec.add_path(urlspec=(path, handler))
 
     spec_json = json.dumps(spec.to_dict())
-    class SpecHandler(tornado.web.RequestHandler):
+    class SpecHandler(BaseHandler):
         def get(self):
             self.set_header('Content-Type', 'application/json')
             self.finish(spec_json)
