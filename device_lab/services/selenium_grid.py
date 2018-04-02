@@ -75,10 +75,11 @@ class SeleniumGridService(object):
         return result
 
     def update_capabilities_from_remote(self):
-        Observable.from_(self.get_all_hubs_url(), scheduler=_scheduler) \
+        Observable.from_(self.get_all_hubs_url()) \
             .distinct() \
             .flat_map(self._fetch_hub_detail_and_unpack_to_caps) \
             .to_list() \
+            .subscribe_on(_scheduler) \
             .subscribe(self.set_capabilities)
 
     def refresh_capabilities_from_remote(self, period):
@@ -97,6 +98,7 @@ class SeleniumGridService(object):
             .map(lambda cap: cap['appium_url']) \
             .distinct() \
             .flat_map(self._fetch_appium_sessions) \
+            .subscribe_on(_scheduler) \
             .subscribe(refresh_capability_lock)
 
     def lock_capability(self, cap_token, timeout):
@@ -138,16 +140,22 @@ class SeleniumGridService(object):
 
     def update_capabilities_in_background(self, period=10):
         Observable.interval(period * 1000, scheduler=_scheduler) \
+            .subscribe_on(_scheduler) \
             .subscribe(lambda _: self.update_capabilities_from_remote())
 
     def refresh_capabilities_in_background(self, period=5):
         Observable.interval(period * 1000, scheduler=_scheduler) \
+            .subscribe_on(_scheduler) \
             .subscribe(lambda _: self.refresh_capabilities_from_remote(period))
 
     def release_expired_lock_in_background(self, period=1):
         ob = Observable.interval(period * 1000, scheduler=_scheduler)
-        ob.subscribe(lambda _: self._appium_lock.release_expired_keys())
-        ob.subscribe(lambda _: self._udid_lock.release_expired_keys())
+        ob \
+            .subscribe_on(_scheduler) \
+            .subscribe(lambda _: self._appium_lock.release_expired_keys())
+        ob \
+            .subscribe_on(_scheduler) \
+            .subscribe(lambda _: self._udid_lock.release_expired_keys())
 
     def _fetch_hub_detail_and_unpack_to_caps(self, hub_url) -> Observable:
         def on_error(e):
