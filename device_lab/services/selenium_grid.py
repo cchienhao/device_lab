@@ -14,7 +14,7 @@ from utils.clients.selenium_grid import SeleniumGridClient
 from utils.clients.appium import AppiumClient
 from utils.managers import SimpleLockManager
 from services.base import BaseServiceException
-from utils.misc import new_random_string, on_exception_return, get_base_url
+from utils.misc import new_random_string, on_exception_return, get_base_url, is_string_in_partially
 
 from config import LOCK_SECRET
 
@@ -52,13 +52,17 @@ class SeleniumGridService(object):
             session.close()
         return list(hub.url for hub in hubs)
 
-    def get_available_capabilities(self, platform_name,
-                                   platform_version=None, min_platform_version=None, max_platform_version=None):
+    def get_all_capabilities(self):
+        return self._capabilities
+
+    def get_available_capabilities(self, platform_name, device_names=None,
+                                   platform_versions=None, min_platform_version=None, max_platform_version=None):
         query = Observable.from_(self._capabilities) \
             .filter(lambda c: not self._appium_lock.is_lock(c['appium_url'])) \
             .filter(lambda c: not self._udid_lock.is_lock(c['capabilities']['UDID'])) \
             .filter(lambda c: platform_name is None or c['capabilities']['platformName'] == platform_name) \
-            .filter(lambda c: not platform_version or c['capabilities']['version'] in platform_version) \
+            .filter(lambda c: not device_names or is_string_in_partially(c['capabilities']['deviceName'], device_names)) \
+            .filter(lambda c: not platform_versions or c['capabilities']['version'] in platform_versions) \
             .filter(lambda c: min_platform_version is None or c['capabilities']['version'] >= min_platform_version) \
             .filter(lambda c: max_platform_version is None or c['capabilities']['version'] <= max_platform_version)
         candidates = list(query.to_blocking())

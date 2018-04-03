@@ -61,7 +61,7 @@ class TestSeleniumGridService(unittest.TestCase):
         self.assertEqual(expected, caps)
 
     def test_query_capabilities2(self):
-        caps = self.service.get_available_capabilities(platform_name='ios', platform_version=['1'])
+        caps = self.service.get_available_capabilities(platform_name='ios', platform_versions=['1'])
         expected = [{'capabilities': {'platformName': 'ios', 'version': '1', 'UDID': 'udid1'}, 'appium_url': 'appium_url1'}]
         self.assertEqual(expected, caps)
 

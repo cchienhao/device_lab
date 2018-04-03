@@ -16,8 +16,13 @@ class CapabilityListHandler(BaseHandler):
         parameters:
             - in: query
               name: platform_name
-              required: true
               type: string
+            - in: query
+              name: device_name
+              collectionFormat: multi
+              type: array
+              items:
+                type: string
             - in: query
               name: platform_version
               collectionFormat: multi
@@ -30,16 +35,25 @@ class CapabilityListHandler(BaseHandler):
             - in: query
               name: max_platform_version
               type: string
+            - in: query
+              name: debug
+              type: boolean
+              description: if true, all capabilities will be return
         responses:
             200:
                 description: available capabilities matched query conditions
         """
-        devices = selenium_grid_service.get_available_capabilities(
-            platform_name=self.get_argument('platform_name'),
-            platform_version=self.get_arguments('platform_version'),
-            min_platform_version=self.get_argument('min_platform_version', None),
-            max_platform_version=self.get_argument('max_platform_version', None),
-        )
+        debug = self.get_argument('debug', 'false')
+        if 'true' == debug:
+            devices = selenium_grid_service.get_all_capabilities()
+        else:
+            devices = selenium_grid_service.get_available_capabilities(
+                platform_name=self.get_argument('platform_name'),
+                device_names=self.get_arguments('device_name'),
+                platform_versions=self.get_arguments('platform_version'),
+                min_platform_version=self.get_argument('min_platform_version', None),
+                max_platform_version=self.get_argument('max_platform_version', None),
+            )
         self.send_response(200, devices)
 
 

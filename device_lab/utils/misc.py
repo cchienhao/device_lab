@@ -27,3 +27,14 @@ def on_exception_return(value_or_callable=None):
 def get_base_url(url):
     (scheme, netloc, path, *others) = urlsplit(url)
     return urlunsplit((scheme, netloc, '/', *others))
+
+
+def is_string_in_partially(s, ss, case_insensitive=True):
+    if case_insensitive:
+        s = s.lower()
+    for _s in ss:
+        if case_insensitive:
+            _s = _s.lower()
+        if _s in s:  # partial match
+            return True
+    return False
